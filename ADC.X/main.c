@@ -43,10 +43,13 @@ int main(void) {
         V = ADCValue * 3.3/1024.0;
         distance = 2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4); // distance in m
         sprintf(buffer, "%.2f", distance);
+        U2TXREG = 'd';
+        U2TXREG = ':';
         for (int i=0; i < strlen(buffer); i++) {
         while (U2STAbits.UTXBF == 1);    // Wait until the Transmit Buffer is not full 
             U2TXREG = buffer[i];   
         }
+        U2TXREG = ' ';
         LATAbits.LATA0 = 0;
         tmr_wait_ms(TIMER1, 1000);
     }
