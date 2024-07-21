@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <project>
-  <executable name="dist/default/production/ADC.X.production.elf">
+  <executable name="dist/default/production/PWM.X.production.elf">
     <memory name="data">
       <units>bytes</units>
       <length>53248</length>
-      <used>76</used>
-      <free>53172</free>
+      <used>4</used>
+      <free>53244</free>
     </memory>
     <memory name="program">
       <units>bytes</units>
       <length>524544</length>
-      <used>16293</used>
-      <free>508251</free>
+      <used>3906</used>
+      <free>520638</free>
     </memory>
   </executable>
 </project>

@@ -3,7 +3,6 @@
  * Author: manu
  */
 
-
 #include "xc.h"
 #include "header.h"
 
@@ -81,31 +80,55 @@ void tmr_wait_ms(int timer, int ms){
     tmr_wait_period(timer); 
 }
 
-// Function to setup the ADC
-void ADCsetup(void) {
-    AD1CON3bits.ADCS = 8;   // Tad = 8*Tcy = 8/72MHz = 111.11ns
-    AD1CON1bits.ASAM = 0;   // Manual sampling
-    AD1CON1bits.SSRC = 7;   // Automatic conversion
-    AD1CON3bits.SAMC = 16;  // Sampling lasts 16 Tad 
-    AD1CON2bits.CHPS = 0;   // use 1-channel (CH0) mode
-    AD1CHS0bits.CH0SA = 14; // Remapping: IR senson is on AN14 (vedi TRISB14)  
-    AD1CON1bits.ADON = 1;   // Turn ADC on
+// Function to set the PWM with Output Compare module
+void PWMsetup(void){
+    
+    //OC1 010000 RPn tied to Output Compare 1 Output
+    //OC2 010001 RPn tied to Output Compare 2 Output
+    //OC3 010010 RPn tied to Output Compare 3 Output
+    //OC4 010011 RPn tied to Output Compare 4 Output
+    
+    RPOR0bits.RP65R = 0x10; // RD1 is RP65 (OC1: 010000 -> 0x10 in hex)
+    RPOR1bits.RP66R = 0x11; // RD2 is RP66 (OC2: 010001 -> 0x11 in hex)
+    RPOR1bits.RP67R = 0x12; // RD3 is RP67 (OC3: 010010 -> 0x12 in hex)
+    RPOR2bits.RP68R = 0x13; // RD4 is RP68 (OC4: 010011 -> 0x13 in hex)
+    
+    // OC1: left wheels anticlockwise
+    OC1CON1bits.OCTSEL = 7;     // Selects the peripheral clock (111 = 7) as the clock source to the OC module
+    OC1CON1bits.OCM = 6;        // Configures the OC module in Edge-Aligned PWM mode (110 = 6)
+    OC1CON2bits.SYNCSEL = 0x1F; // Specifies that the OC module is synchronized to itself, meaning it operates independently without external synchronization: Tpwm = Tcy (11111 = 1f)
+    
+    // OC2: left wheels clockwise
+    OC2CON1bits.OCTSEL = 7;
+    OC2CON1bits.OCM = 6; 
+    OC2CON2bits.SYNCSEL = 0x1F;
+
+    // OC3: right wheels anticlockwise
+    OC3CON1bits.OCTSEL = 7;
+    OC3CON1bits.OCM = 6;
+    OC3CON2bits.SYNCSEL = 0x1F;
+
+    // OC4: right wheels clockwise
+    OC4CON1bits.OCTSEL = 7;
+    OC4CON1bits.OCM = 6;
+    OC4CON2bits.SYNCSEL = 0x1F;
+    
+    // OCxRS define the max period
+    OC1RS = OC2RS = OC3RS = OC4RS = DutyCycleMax;
+    
+    // Setup OCxR to 0 at start
+    OC1R = OC2R = OC3R = OC4R = 0;
 }
 
-// Function to setup the UART (mounted on mikroBUS2, 9600 bps)
-void UARTsetup(void){
-    // From documentation (pag.9 datasheet):
-    // RD0(RP64) -> TX
-    // RD11(RPI75) -> RX
-    // For Transitter: Find 'OUTPUT SELECTION FOR REMAPPABLE PINS' in datasheet
-    // Under U2TX -> 000011 -> 0x03 in hex
-    // For Receiver: Find 'INPUT PIN SELECTION FOR SELECTABLE INPUT SOURCES' in datasheet
-    // Under RPI75 -> 1001011 -> 0x4B
-    
-    RPOR0bits.RP64R = 0x03;   //Map UART2 TX to pin RD0 which is RP64
-    RPINR19bits.U2RXR = 0x4B; //Map UART2 RX to pin RD11 which is RPI75
-    
-    U2BRG = FCY / (16 * 9600) - 1;
-    U2MODEbits.UARTEN = 1;    // Enable UART 
-    U2STAbits.UTXEN = 1;      // Enable Transmission (must be after UARTEN)
+// Function to stop PWM
+void PWMstop(void){
+    OC1R = OC2R = OC3R = OC4R = 0;
+}
+
+// Function to move forward
+void PWMstart(void){
+    OC1R = 0;
+    OC2R = DutyCycleMax;
+    OC3R = 0;
+    OC4R = DutyCycleMax; // Multiply by 0.75 to make the buggy with right while going forward
 }
