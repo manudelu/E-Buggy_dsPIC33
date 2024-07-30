@@ -20,24 +20,19 @@ volatile int ledState = 0;   // Variable to keep track of the LED state
 
 //Interrupt service Routine associated to RE8 button
 void __attribute__ ((__interrupt__ , __auto_psv__)) _INT1Interrupt() {
-    IEC1bits.INT1IE = 0;          // Disable the interrupt
     IFS1bits.INT1IF = 0;          // Reset interrupt flag
     
     tmr_setup_period(TIMER2, 10); // Start TIMER2 to avoid bouncing
-    IEC0bits.T2IE = 1;            // Enable TIMER2 interrupt
 }
 
 void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
     IFS0bits.T2IF = 0;  // Clear TIMER2 Interrupt Flag
-    IEC0bits.T2IE = 0;  // Disable TIMER2 interrupt
     T2CONbits.TON = 0;  // Stop the timer
 
     if(PORTEbits.RE8 == 1){        // Check if the button is still pressed
         ledState = !ledState;      // Toggle the LED state
         LATGbits.LATG9 = ledState; // Update the LED based on the state
     }        
-    
-    IEC1bits.INT1IE = 1; // Re-enable the INT1 interrupt
 }
 
 int main(void) {
@@ -60,6 +55,7 @@ int main(void) {
     INTCON2bits.GIE = 1;      // Set global interrupt enable
     IFS1bits.INT1IF = 0;      // Clear INT1 interrupt flag
     IEC1bits.INT1IE = 1;      // Enable INT1 interrupt
+    IEC0bits.T2IE = 1; 
     
     while(1) {
         // Blink LED1 at 2.5 Hz
