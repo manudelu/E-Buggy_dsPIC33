@@ -14,6 +14,9 @@
 #define WaitForStart 0
 #define Moving 1
 
+#define MINTH 25      // Minimum distance threshold
+#define MAXTH 70      // Maximum distance threshold
+
 // Definition of LED related functions
 void LigthsSetup();
 
