@@ -11,27 +11,24 @@
 #define MaxTime 200     // Maximum time period that the timer can handle in one go
                         // Tecnhically the max amount possible is 233ms: Tmax = MaxInt*Presc/Fcy, where Presc = 256
 
-#define WaitForStart 0
-#define Moving 1
-
 #define MINTH 25      // Minimum distance threshold
 #define MAXTH 70      // Maximum distance threshold
 
-// Definition of LED related functions
+// LED related functions
 void LigthsSetup();
 
-// Definition of Timer related functions
+// Timer related functions
 void tmr_setup_period(int timer, int ms); 
 void tmr_wait_period(int timer);
 void tmr_wait_ms(int timer, int ms);
 
-// Definition of ADC related functions
+// ADC related functions
 void ADCsetup();
 
-// Definition of UART related functions
+// UART related functions
 void UARTsetup();
 
-// Definition of PWM related functions
+// PWM related functions
 void PWMsetup(int PWM_freq);
 void PWMstop();
 void PWMstart(int surge, int yaw_rate);

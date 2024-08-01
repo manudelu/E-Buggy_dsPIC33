@@ -79,10 +79,9 @@ void tmr_wait_ms(int timer, int ms){
 // Set all buggy's lights as output
 void LigthsSetup(void) {
     TRISAbits.TRISA0 = 0; // Led1 (RA0) 
-    TRISGbits.TRISG9 = 0; // Led2 (RG9) 
-    TRISAbits.TRISA7 = 0; // Beam Headlights (RA7)
     TRISBbits.TRISB8 = 0; // Left Side Lights (RB8)
     TRISFbits.TRISF1 = 0; // Right Side Lights (RF1)
+    TRISAbits.TRISA7 = 0; // Beam Headlights (RA7)
     TRISFbits.TRISF0 = 0; // Brakes (RF0)
     TRISGbits.TRISG1 = 0; // Low Intensity Lights (RG1)
 }
@@ -96,7 +95,7 @@ void ADCsetup(void) {
     TRISBbits.TRISB14 = 1;
     ANSELBbits.ANSB14 = 1;  
     
-    AD1CON3bits.ADCS = 8;   // Tad = 8*Tcy = 8/72MHz = 111.11ns
+    AD1CON3bits.ADCS = 14;   // Tad = 8*Tcy = 8/72MHz = 111.11ns
     AD1CON1bits.ASAM = 0;   // Manual sampling
     AD1CON1bits.SSRC = 7;   // Automatic conversion
     AD1CON3bits.SAMC = 16;  // Sampling lasts 16 Tad 
@@ -105,7 +104,6 @@ void ADCsetup(void) {
     
     AD1CON2bits.CSCNA = 1;  // Scan mode enabled
     AD1CSSLbits.CSS14 = 1;  // Scan for AN14 IR sensor
-    AD1CHS0bits.CH0SA = 14; // Remapping: IR senson is on AN14 (see TRISB14)
     AD1CON2bits.SMPI = 1;   // N-1 channels
     
     AD1CON1bits.ADON = 1;   // Turn ADC on

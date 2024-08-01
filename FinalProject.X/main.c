@@ -5,34 +5,40 @@
 #include <string.h>
 #include <math.h>
 
-volatile int button_pressed = 0;
-volatile int state = 0;
+typedef enum {
+    WaitForStart,
+    Moving
+} State;
 
-//Interrupt service Routine associated to INT1 flag
+volatile State state = WaitForStart;
+
+// Interrupt service routine for INT1 
 void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){  
     IFS1bits.INT1IF = 0;          // Reset interrupt flag
     tmr_setup_period(TIMER2, 10);   
 }
 
+// Interrupt service routine for Timer2
 void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
-    IFS0bits.T2IF = 0;  // Reset External Interrupt 2 Flag Status bit
+    IFS0bits.T2IF = 0;  // Reset Interrupt Flag 
     T2CONbits.TON = 0;  // Stop timer 2
     
     if(PORTEbits.RE8 == 1){
-      button_pressed = 1;
+        state = (state == WaitForStart) ? Moving : WaitForStart;
     }
 }
 
 int main(void) {
-    
     ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000;
     
     int surge = 0; 
     int yaw_rate = 0;
     float ADCValue, V, distance;
     char buffer[16];
+    int blink_timer_buggy = 0;  // Timer for buggy's LED blinking
+    int blink_timer_board = 0;  // Timer for board's LED blinking
     
-    // setting proportional parameter
+    // Setting proportional parameter
     int s = 2 ;
     int y = 500;
     
@@ -47,6 +53,7 @@ int main(void) {
      
     LigthsSetup();
     ADCsetup();
+    UARTsetup();
     
     // Remapping INT1 to RE8 (RPI88)
     RPINR0bits.INT1R = 0x58;  // RPI88 -> 0x58 in hex
@@ -55,37 +62,49 @@ int main(void) {
     IEC1bits.INT1IE = 1;      // Enable INT1 interrupt
     IEC0bits.T2IE = 1;        // Enable T2 Interrupt (?)
     
-    U2TXREG = 'c'; // vedi quando la scheda è online
+    U2TXREG = 'c'; // Check if the board is online
     
     while(1) {
+        // ADC sampling
         do{
             if (AD1CON1bits.SAMP == 0)
                 AD1CON1bits.SAMP = 1;      // Start sampling
         }while(!AD1CON1bits.DONE);         // Wait for sampling completion
-        ADCValue = (float)ADC1BUF0;        // Get ADC value (ADC1BUF0 is the ADC buffer in which conversions are stored))
-        V = ADCValue * 3.3/(float)1024.0;  // 3.3V mapped in 10bit
+        ADCValue = (float)ADC1BUF1;        // Get ADC value (perchè 1 e non 0??)
+        V = ADCValue * 3.3/1024.0;         // Convert to voltage
         distance = 100*(2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
-
+        sprintf(buffer, "d:%.2f", distance);
+        for (int i=0; i < strlen(buffer); i++) {
+            while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
+            U2TXREG = buffer[i];   
+        }
+        
+        // Board LED blinking
+        if (blink_timer_board == 500){
+            LATAbits.LATA0 = !LATAbits.LATA0;  // Toggle Led1
+            blink_timer_board = 0;
+        }
+        
+        // State handling
         if (state == WaitForStart) {
-   
             // Set PWM DC of all the motors to 0
             PWMstop();
-                
-            // LED A0 starts blinking at 1Hz frequency
-            tmr_wait_ms(TIMER1, 500);         
-            LATAbits.LATA0 = !LATAbits.LATA0;  
-            tmr_wait_ms(TIMER1, 500);          
-            LATAbits.LATA0 = !LATAbits.LATA0;  
-                
-            // Whenever the button RE8 is pressed change state
-            if (button_pressed) {
-                state = Moving;
-                button_pressed = 0;
-            }
+            
+            // Turn off lights
+            LATAbits.LATA7 = 0; // Beam Headlights 
+            LATFbits.LATF0 = 0; // Brakes 
+            LATGbits.LATG1 = 0; // Low Intensity Lights 
+            
+            // Buggy LED blinking
+            if (blink_timer_buggy == 500) {
+                LATBbits.LATB8 = !LATBbits.LATB8;  // Toggle Left Side Light
+                LATFbits.LATF1 = !LATFbits.LATF1;  // Toggle Right Side Light
+                blink_timer_buggy = 0;
+            } 
         }
 
         else if (state == Moving) {
-            
+            // Handle turning
             if (flag && distance > MAXTH && turn_count < 500){
                 turn_count++;
             }
@@ -108,23 +127,36 @@ int main(void) {
                 
             // Set PWM DC of all the motors based on the surge and yaw rate
             PWMstart(surge, yaw_rate);
-                
-            // LED A0 starts blinking at 1Hz frequency
-            tmr_wait_ms(TIMER1, 500);          // 500ms delay
-            LATAbits.LATA0 = !LATAbits.LATA0;  // Toggle Led1
-            LATBbits.LATB8 = !LATBbits.LATB8;  // Toggle Left Side Light
-            LATFbits.LATF1 = !LATFbits.LATF1;  // Toggle Right Side Light
-            tmr_wait_ms(TIMER1, 500);          
-            LATAbits.LATA0 = !LATAbits.LATA0;  
-            LATBbits.LATB8 = !LATBbits.LATB8;  
-            LATFbits.LATF1 = !LATFbits.LATF1;  
-                
-            // Whenever the button RE8 is pressed change state
-            if (button_pressed) {
-                state = WaitForStart;
-                button_pressed = 0;
+            
+            // Control lights based on surge
+            if (surge > 50){
+                LATAbits.LATA7 = 1; // Beam Headlights 
+                LATFbits.LATF0 = 0; // Brakes 
+                LATGbits.LATG1 = 0; // Low Intensity Lights 
+            }
+            else{
+                LATAbits.LATA7 = 0; // Beam Headlights 
+                LATFbits.LATF0 = 1; // Brakes 
+                LATGbits.LATG1 = 1; // Low Intensity Lights 
+            }
+            
+            // Control side lights based on yaw_rate
+            if (yaw_rate > 15){
+                LATBbits.LATB8 = 0;
+                if (blink_timer_buggy == 500){
+                    LATFbits.LATF1 = !LATFbits.LATF1;
+                    blink_timer_buggy = 0;
+                }
+            }
+            else{
+                LATBbits.LATB8 = 0;
+                LATFbits.LATF1 = 0;
             }
         }
+        
+        blink_timer_board++;
+        blink_timer_buggy++;
+        tmr_wait_period(TIMER1);
     }
     return 0;
 }
