@@ -96,7 +96,7 @@ int main(void) {
         }
         
         // Board LED blinking
-        if (blink_timer_board == 500){
+        if (blink_timer_board == 1000){
             LATAbits.LATA0 = !LATAbits.LATA0;  // Toggle Led1
             blink_timer_board = 0;
         }
@@ -112,7 +112,7 @@ int main(void) {
             LATGbits.LATG1 = 0; // Low Intensity Lights 
             
             // Buggy LED blinking
-            if (blink_timer_buggy == 500) {
+            if (blink_timer_buggy == 1000) {
                 LATBbits.LATB8 = !LATBbits.LATB8;  // Toggle Left Side Light
                 LATFbits.LATF1 = !LATFbits.LATF1;  // Toggle Right Side Light
                 blink_timer_buggy = 0;
@@ -159,7 +159,7 @@ int main(void) {
             // Control side lights based on yaw_rate
             if (yaw_rate > 15){
                 LATBbits.LATB8 = 0;
-                if (blink_timer_buggy == 500){
+                if (blink_timer_buggy == 1000){
                     LATFbits.LATF1 = !LATFbits.LATF1;
                     blink_timer_buggy = 0;
                 }
