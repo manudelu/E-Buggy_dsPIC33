@@ -38,6 +38,8 @@ int main(void) {
     int blink_timer_buggy = 0;  // Timer for buggy's LED blinking
     int blink_timer_board = 0;  // Timer for board's LED blinking
     
+    int choice = 0;
+    
     // Setting proportional parameter
     int s = 2 ;
     int y = 500;
@@ -62,21 +64,35 @@ int main(void) {
     IEC1bits.INT1IE = 1;      // Enable INT1 interrupt
     IEC0bits.T2IE = 1;        // Enable T2 Interrupt (?)
     
-    U2TXREG = 'c'; // Check if the board is online
-    
-    while(1) {
+    while(1) {       
         // ADC sampling
         do{
             if (AD1CON1bits.SAMP == 0)
                 AD1CON1bits.SAMP = 1;      // Start sampling
         }while(!AD1CON1bits.DONE);         // Wait for sampling completion
-        ADCValue = (float)ADC1BUF1;        // Get ADC value (perchè 1 e non 0??)
-        V = ADCValue * 3.3/1024.0;         // Convert to voltage
-        distance = 100*(2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
-        sprintf(buffer, "d:%.2f", distance);
-        for (int i=0; i < strlen(buffer); i++) {
-            while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
-            U2TXREG = buffer[i];   
+        
+        choice = 0;  // placeholder per distinguire tra batteria (1) e ir (0)
+        if (choice == 0){
+            ADCValue = (float)ADC1BUF1;        // Get ADC value 
+            V = ADCValue * 3.3/1024.0;         // Convert to voltage
+            distance = 100*(2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
+            sprintf(buffer, "$MDIST,%d ", distance);
+            for (int i=0; i < strlen(buffer); i++) {
+                while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
+                U2TXREG = buffer[i];   
+            }
+        }
+        else if (choice == 1){
+            const float R49 = 100.0, R51 = 100.0, R54 = 100.0;
+            ADCValue = (float)ADC1BUF0;
+            V = ADCValue * 3.3/1024.0;
+            float Rs = R49 + R51;
+            float battery = V * (Rs + R54) / R54;
+            sprintf(buffer, "$MBATT,%.2f ", battery);
+            for (int i = 0; i < strlen(buffer); i++){
+                while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
+                U2TXREG = buffer[i];
+            }
         }
         
         // Board LED blinking

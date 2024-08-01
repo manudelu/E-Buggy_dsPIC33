@@ -95,6 +95,10 @@ void ADCsetup(void) {
     TRISBbits.TRISB14 = 1;
     ANSELBbits.ANSB14 = 1;  
     
+    // Enable Battery Sensor analog configuration AN11
+    TRISBbits.TRISB11 = 1;
+    ANSELBbits.ANSB11 = 1;
+    
     AD1CON3bits.ADCS = 14;   // Tad = 8*Tcy = 8/72MHz = 111.11ns
     AD1CON1bits.ASAM = 0;   // Manual sampling
     AD1CON1bits.SSRC = 7;   // Automatic conversion
@@ -104,6 +108,7 @@ void ADCsetup(void) {
     
     AD1CON2bits.CSCNA = 1;  // Scan mode enabled
     AD1CSSLbits.CSS14 = 1;  // Scan for AN14 IR sensor
+    AD1CSSLbits.CSS11 = 1;  // Scan for AN14 IR sensor
     AD1CON2bits.SMPI = 1;   // N-1 channels
     
     AD1CON1bits.ADON = 1;   // Turn ADC on
