@@ -76,7 +76,7 @@ int main(void) {
             ADCValue = (float)ADC1BUF1;        // Get ADC value 
             V = ADCValue * 3.3/1024.0;         // Convert to voltage
             distance = 100*(2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
-            sprintf(buffer, "$MDIST,%d ", distance);
+            sprintf(buffer, "d:%.2f ", distance);
             for (int i=0; i < strlen(buffer); i++) {
                 while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
                 U2TXREG = buffer[i];   
