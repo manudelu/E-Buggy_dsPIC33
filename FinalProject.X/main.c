@@ -76,7 +76,7 @@ int main(void) {
             ADCValue = (float)ADC1BUF1;        // Get ADC value 
             V = ADCValue * 3.3/1024.0;         // Convert to voltage
             distance = 100*(2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
-            sprintf(buffer, "d:%.2f ", distance);
+            sprintf(buffer, "$MDIST,%d*\n", distance);
             for (int i=0; i < strlen(buffer); i++) {
                 while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
                 U2TXREG = buffer[i];   
@@ -88,7 +88,20 @@ int main(void) {
             V = ADCValue * 3.3/1024.0;
             float Rs = R49 + R51;
             float battery = V * (Rs + R54) / R54;
-            sprintf(buffer, "$MBATT,%.2f ", battery);
+            sprintf(buffer, "$MBATT,%.2f*\n", battery);
+            for (int i = 0; i < strlen(buffer); i++){
+                while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
+                U2TXREG = buffer[i];
+            }
+        }
+        else if (choice == 2){
+            // OCxR - Sets the time the signal is high
+            // OCxRS - Sets the period of the PWM signal
+            int dc1 = OC1R/OC1RS * 100;  
+            int dc2 = OC2R/OC2RS * 100;
+            int dc3 = OC3R/OC3RS * 100;
+            int dc4 = OC4R/OC4RS * 100;
+            sprintf(buffer, "$MPWM,%d,%d,%d,%d*\n", dc1, dc2, dc3, dc4);
             for (int i = 0; i < strlen(buffer); i++){
                 while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
                 U2TXREG = buffer[i];
