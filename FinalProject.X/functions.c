@@ -2,10 +2,9 @@
 #include "header.h"
 #include <math.h>
 
-// Function that setups the timer to count for the specified amount of ms
-void tmr_setup_period(int timer, int ms){
-    
-    long steps = FCY * (ms / 1000.0); // Number of clock cycles (steps)
+// Set up the timer with a specified period in milliseconds
+void tmr_setup_period(int timer, int ms){   
+    long steps = FCY * (ms / 1000.0); // Calculate number of clock cycles
     int presc, t;                     
     
     // Find the smallest prescaler such that the number of required 
@@ -30,7 +29,8 @@ void tmr_setup_period(int timer, int ms){
         // Error: the desired period is too long even with the largest prescaler
         return;
     }
-    
+   
+    // Configure the specified timer
     switch(timer) {
         case TIMER1: 
             TMR1 = 0;               // Reset timer counter
@@ -50,22 +50,22 @@ void tmr_setup_period(int timer, int ms){
     }
 }
 
-// Function to wait for the completion of a timer period
+// Wait for a timer period to complete
 void tmr_wait_period(int timer){
     switch(timer){
         case TIMER1:
             while(IFS0bits.T1IF == 0){};
-            IFS0bits.T1IF = 0; // Reset timer1 interrupt flag
+            IFS0bits.T1IF = 0; // Reset Timer1 interrupt flag
             break;
             
         case TIMER2:
             while(IFS0bits.T2IF == 0){};
-            IFS0bits.T2IF = 0;
+            IFS0bits.T2IF = 0; // Reset Timer2 interrupt flag
             break;
     }
 }
 
-// Function to wait for a specified number of milliseconds using a timer
+// Wait for a specified number of milliseconds using a timer
 void tmr_wait_ms(int timer, int ms){
     while (ms > MaxTime) {
         tmr_setup_period(timer, MaxTime); 
@@ -88,9 +88,6 @@ void LigthsSetup(void) {
 
 // Function to setup the ADC
 void ADCsetup(void) {
-    // Enable IR sensor on the digital I/O on RB9
-    TRISBbits.TRISB9 = 0;
-    LATBbits.LATB9 = 1;  
     // IR Sensor analog configuration AN14 (mounted on front right mikroBUS)
     TRISBbits.TRISB14 = 1;
     ANSELBbits.ANSB14 = 1;  
@@ -99,7 +96,7 @@ void ADCsetup(void) {
     TRISBbits.TRISB11 = 1;
     ANSELBbits.ANSB11 = 1;
     
-    AD1CON3bits.ADCS = 14;   // Tad = 8*Tcy = 8/72MHz = 111.11ns
+    AD1CON3bits.ADCS = 14;  // Tad = 8*Tcy = 8/72MHz = 111.11ns
     AD1CON1bits.ASAM = 0;   // Manual sampling
     AD1CON1bits.SSRC = 7;   // Automatic conversion
     AD1CON3bits.SAMC = 16;  // Sampling lasts 16 Tad 
@@ -108,10 +105,10 @@ void ADCsetup(void) {
     
     AD1CON2bits.CSCNA = 1;  // Scan mode enabled
     AD1CSSLbits.CSS14 = 1;  // Scan for AN14 IR sensor
-    AD1CSSLbits.CSS11 = 1;  // Scan for AN14 IR sensor
+    AD1CSSLbits.CSS11 = 1;  // Scan for AN11 Battery sensor
     AD1CON2bits.SMPI = 1;   // N-1 channels
     
-    AD1CON1bits.ADON = 1;   // Turn ADC on
+    AD1CON1bits.ADON = 1;   // Turn on the ADC module
 }
 
 // Function to setup the UART (mounted on mikroBUS2, 9600 bps)

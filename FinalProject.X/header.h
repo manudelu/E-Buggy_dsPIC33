@@ -12,7 +12,7 @@
                         // Tecnhically the max amount possible is 233ms: Tmax = MaxInt*Presc/Fcy, where Presc = 256
 
 #define MINTH 25      // Minimum distance threshold
-#define MAXTH 70      // Maximum distance threshold
+#define MAXTH 50      // Maximum distance threshold
 
 // LED related functions
 void LigthsSetup();
