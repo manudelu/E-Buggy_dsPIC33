@@ -14,6 +14,33 @@
 #define MINTH 25      // Minimum distance threshold
 #define MAXTH 50      // Maximum distance threshold
 
+#define STATE_DOLLAR  (1) // we discard everything until a dollar is found
+#define STATE_TYPE    (2) // we are reading the type of msg until a comma is found
+#define STATE_PAYLOAD (3) // we read the payload until an asterix is found
+#define NEW_MESSAGE (1)   // new message received and parsed completely
+#define NO_MESSAGE (0)    // no new messages
+
+#define BUFFER_SIZE 13   //9.6 byte/s -> 10 is just enough, 13: final size of cb (10 + 25%(10))
+
+// Define the CircularBuffer structure
+typedef struct {
+    char buffer[BUFFER_SIZE];
+    int head;
+    int tail;
+    int to_read;
+} CircularBuffer;
+
+typedef struct { 
+	int state;
+	char msg_type[6];       // type is 5 chars + string terminator
+	char msg_payload[100];  // assume payload cannot be longer than 100 chars
+	int index_type;
+	int index_payload;
+} parser_state;
+
+// Parser related functions
+int parse_byte(parser_state* ps, char byte);
+
 // LED related functions
 void LigthsSetup();
 
@@ -32,5 +59,12 @@ void UARTsetup();
 void PWMsetup(int PWM_freq);
 void PWMstop();
 void PWMstart(int surge, int yaw_rate);
+
+void cb_push(volatile CircularBuffer *cb, char data);
+
+float getDistance();
+void sendDistance();
+void sendBattery();
+void sendDC();
 
 #endif	

@@ -89,8 +89,11 @@ void LigthsSetup(void) {
 // Function to setup the ADC
 void ADCsetup(void) {
     // IR Sensor analog configuration AN14 (mounted on front right mikroBUS)
-    TRISBbits.TRISB14 = 1;
-    ANSELBbits.ANSB14 = 1;  
+    TRISBbits.TRISB15 = 1;
+    ANSELBbits.ANSB15 = 1; 
+    
+    TRISAbits.TRISA3 = 0; // IR distance sensor enable line  
+    LATAbits.LATA3 = 1; // enable EN pin
     
     // Enable Battery Sensor analog configuration AN11
     TRISBbits.TRISB11 = 1;
@@ -104,7 +107,7 @@ void ADCsetup(void) {
     AD1CON1bits.SIMSAM = 0; // Sequential sampling
     
     AD1CON2bits.CSCNA = 1;  // Scan mode enabled
-    AD1CSSLbits.CSS14 = 1;  // Scan for AN14 IR sensor
+    AD1CSSLbits.CSS15 = 1;  // Scan for AN14 IR sensor
     AD1CSSLbits.CSS11 = 1;  // Scan for AN11 Battery sensor
     AD1CON2bits.SMPI = 1;   // N-1 channels
     
@@ -183,8 +186,8 @@ void PWMstart(int surge, int yaw_rate){
     // Normalize PWM values to ensure they are within the range -100% to 100%
     float max_pwm = fmax(fabs(left_pwm), fabs(right_pwm));
     if (max_pwm > 100) {
-        left_pwm /= max_pwm;
-        right_pwm /= max_pwm;
+        left_pwm *= 0.9;
+        right_pwm *= 0.9;
     }
     
     // Generate PWM signals for the wheels
@@ -202,5 +205,115 @@ void PWMstart(int surge, int yaw_rate){
     } else {
         OC3R = (-right_pwm/100) * OC3RS;
         OC4R = 0; 
+    }
+}
+
+int parse_byte(parser_state* ps, char byte) {
+    switch (ps->state) {
+        case STATE_DOLLAR:
+            if (byte == '$') {
+                ps->state = STATE_TYPE;
+                ps->index_type = 0;
+            }
+            break;
+        case STATE_TYPE:
+            if (byte == ',') {
+                ps->state = STATE_PAYLOAD;
+                ps->msg_type[ps->index_type] = '\0';
+                ps->index_payload = 0; // initialize properly the index
+            } else if (ps->index_type == 6) { // error! 
+                ps->state = STATE_DOLLAR;
+                ps->index_type = 0;
+			} else if (byte == '*') {
+				ps->state = STATE_DOLLAR; // get ready for a new message
+                ps->msg_type[ps->index_type] = '\0';
+				ps->msg_payload[0] = '\0'; // no payload
+                return NEW_MESSAGE;
+            } else {
+                ps->msg_type[ps->index_type] = byte; // ok!
+                ps->index_type++; // increment for the next time;
+            }
+            break;
+        case STATE_PAYLOAD:
+            if (byte == '*') {
+                ps->state = STATE_DOLLAR; // get ready for a new message
+                ps->msg_payload[ps->index_payload] = '\0';
+                return NEW_MESSAGE;
+            } else if (ps->index_payload == 100) { // error
+                ps->state = STATE_DOLLAR;
+                ps->index_payload = 0;
+            } else {
+                ps->msg_payload[ps->index_payload] = byte; // ok!
+                ps->index_payload++; // increment for the next time;
+            }
+            break;
+    }
+    return NO_MESSAGE;
+}
+
+// Function to push data into the circular buffer
+void cb_push(volatile CircularBuffer *cb, char data) {
+    
+    cb->buffer[cb->head] = data;  // Load the data into the buffer at the current head position
+    cb->head++;                   // Move the head to the next data offset
+    cb->to_read++;                // Increment the variable keeping track of the char available for reading
+    
+    // Wrap around to the beginning if we've reached the end of the buffer
+    if (cb->head == BUFFER_SIZE)
+        cb->head = 0;             
+}
+
+float getDistance(){
+    float ADCValue, V, distance; 
+    ADCValue = ADC1BUF1;        // Get ADC value 
+    V = ADCValue * 3.3/1024.0;         // Convert to voltage
+    distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
+    
+    return distance;
+}
+
+void sendDistance(){
+    float ADCValue, V, distance; 
+    ADCValue = ADC1BUF1;        // Get ADC value 
+    V = ADCValue * 3.3/1024.0;         // Convert to voltage
+    distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
+    
+    char buffer[16];
+    sprintf(buffer, "MDIST,%d*\n", (int)distance); // bisogna metter %d* da specifiche
+    for (int i=0; i < strlen(buffer); i++) {
+        while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
+        U2TXREG = buffer[i];   
+    }
+}
+
+void sendBattery(){
+    float ADCValue, V;
+    const float R49 = 100.0, R51 = 100.0, R54 = 100.0;
+    ADCValue = ADC1BUF0;
+    V = ADCValue * 3.3/1024.0;
+    float Rs = R49 + R51;
+    float battery = V * (Rs + R54) / R54;
+    
+    char buffer[16];
+    sprintf(buffer, "$MBATT,%.2f*\n", battery);
+    for (int i = 0; i < strlen(buffer); i++){
+        while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
+        U2TXREG = buffer[i];
+    }
+}
+
+void sendDC(){
+    // OCxR - Sets the time the signal is high
+    // OCxRS - Sets the period of the PWM signal
+    int dc1 = OC1R/OC1RS * 100;  
+    int dc2 = OC2R/OC2RS * 100;
+    int dc3 = OC3R/OC3RS * 100;
+    int dc4 = OC4R/OC4RS * 100;
+    
+    char buffer[16];
+    sprintf(buffer, "$MPWM,%d,%d,%d,%d*\n", dc1, dc2, dc3, dc4);
+    for (int i = 0; i < strlen(buffer); i++){
+        while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
+        U2TXREG = buffer[i];
     }
 }
