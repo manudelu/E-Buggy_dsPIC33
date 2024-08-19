@@ -88,7 +88,7 @@ void LigthsSetup(void) {
 
 // Function to setup the ADC
 void ADCsetup(void) {
-    // IR Sensor analog configuration AN14 (mounted on front right mikroBUS)
+    // IR Sensor analog configuration AN15 (mounted on front left mikroBUS)
     TRISBbits.TRISB15 = 1;
     ANSELBbits.ANSB15 = 1; 
     
@@ -208,6 +208,73 @@ void PWMstart(int surge, int yaw_rate){
     }
 }
 
+float getDistance(){
+    float ADCValue, V, distance; 
+    ADCValue = ADC1BUF1;        // Get ADC value 
+    V = ADCValue * 3.3/1024.0;         // Convert to voltage
+    distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
+    
+    return distance;
+}
+
+void scheduler(heartbeat schedInfo[], int nTasks) 
+{
+    int i;
+    for (i = 0; i < nTasks; i++) {
+        schedInfo[i].n++;
+        if (schedInfo[i].enable == 1 && schedInfo[i].n >= schedInfo[i].N) {
+            schedInfo[i].f(schedInfo[i].params);            
+            schedInfo[i].n = 0;
+        }
+    }
+}
+
+void task_send_distance(void* param){
+    float ADCValue, V, distance; 
+    ADCValue = ADC1BUF1;        // Get ADC value 
+    V = ADCValue * 3.3/1024.0;         // Convert to voltage
+    distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
+    
+    char buffer[16];
+    sprintf(buffer, "MDIST,%d*\n", (int)distance); // bisogna metter %d* da specifiche
+    for (int i=0; i < strlen(buffer); i++) {
+        while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
+        U2TXREG = buffer[i];   
+    }
+}
+
+void task_send_battery(void* param){
+    float ADCValue, V;
+    const float R49 = 100.0, R51 = 100.0, R54 = 100.0;
+    ADCValue = ADC1BUF0;
+    V = ADCValue * 3.3/1024.0;
+    float Rs = R49 + R51;
+    float battery = V * (Rs + R54) / R54;
+    
+    char buffer[16];
+    sprintf(buffer, "$MBATT,%.2f*\n", battery);
+    for (int i = 0; i < strlen(buffer); i++){
+        while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
+        U2TXREG = buffer[i];
+    }
+}
+
+void task_send_dutycycle(void* param){
+    // OCxR - Sets the time the signal is high
+    // OCxRS - Sets the period of the PWM signal
+    int dc1 = OC1R/OC1RS * 100;  
+    int dc2 = OC2R/OC2RS * 100;
+    int dc3 = OC3R/OC3RS * 100;
+    int dc4 = OC4R/OC4RS * 100;
+    
+    char buffer[16];
+    sprintf(buffer, "$MPWM,%d,%d,%d,%d*\n", dc1, dc2, dc3, dc4);
+    for (int i = 0; i < strlen(buffer); i++){
+        while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
+        U2TXREG = buffer[i];
+    }
+}
+
 int parse_byte(parser_state* ps, char byte) {
     switch (ps->state) {
         case STATE_DOLLAR:
@@ -251,6 +318,32 @@ int parse_byte(parser_state* ps, char byte) {
     return NO_MESSAGE;
 }
 
+int extract_integer(const char* str) {
+	int i = 0, number = 0, sign = 1;
+	
+	if (str[i] == '-') {
+		sign = -1;
+		i++;
+	}
+	else if (str[i] == '+') {
+		sign = 1;
+		i++;
+	}
+	while (str[i] != ',' && str[i] != '\0') {
+		number *= 10; // multiply the current number by 10;
+		number += str[i] - '0'; // converting character to decimal number
+		i++;
+	}
+	return sign*number;
+}		
+
+int next_value(const char* msg, int i) {
+	while (msg[i] != ',' && msg[i] != '\0') { i++; }
+	if (msg[i] == ',')
+		i++;
+	return i;
+}
+
 // Function to push data into the circular buffer
 void cb_push(volatile CircularBuffer *cb, char data) {
     
@@ -263,57 +356,4 @@ void cb_push(volatile CircularBuffer *cb, char data) {
         cb->head = 0;             
 }
 
-float getDistance(){
-    float ADCValue, V, distance; 
-    ADCValue = ADC1BUF1;        // Get ADC value 
-    V = ADCValue * 3.3/1024.0;         // Convert to voltage
-    distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
-    
-    return distance;
-}
 
-void sendDistance(){
-    float ADCValue, V, distance; 
-    ADCValue = ADC1BUF1;        // Get ADC value 
-    V = ADCValue * 3.3/1024.0;         // Convert to voltage
-    distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
-    
-    char buffer[16];
-    sprintf(buffer, "MDIST,%d*\n", (int)distance); // bisogna metter %d* da specifiche
-    for (int i=0; i < strlen(buffer); i++) {
-        while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
-        U2TXREG = buffer[i];   
-    }
-}
-
-void sendBattery(){
-    float ADCValue, V;
-    const float R49 = 100.0, R51 = 100.0, R54 = 100.0;
-    ADCValue = ADC1BUF0;
-    V = ADCValue * 3.3/1024.0;
-    float Rs = R49 + R51;
-    float battery = V * (Rs + R54) / R54;
-    
-    char buffer[16];
-    sprintf(buffer, "$MBATT,%.2f*\n", battery);
-    for (int i = 0; i < strlen(buffer); i++){
-        while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
-        U2TXREG = buffer[i];
-    }
-}
-
-void sendDC(){
-    // OCxR - Sets the time the signal is high
-    // OCxRS - Sets the period of the PWM signal
-    int dc1 = OC1R/OC1RS * 100;  
-    int dc2 = OC2R/OC2RS * 100;
-    int dc3 = OC3R/OC3RS * 100;
-    int dc4 = OC4R/OC4RS * 100;
-    
-    char buffer[16];
-    sprintf(buffer, "$MPWM,%d,%d,%d,%d*\n", dc1, dc2, dc3, dc4);
-    for (int i = 0; i < strlen(buffer); i++){
-        while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
-        U2TXREG = buffer[i];
-    }
-}

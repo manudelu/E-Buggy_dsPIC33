@@ -38,8 +38,33 @@ typedef struct {
 	int index_payload;
 } parser_state;
 
+typedef struct {
+    int n;
+    int N;
+    int enable;
+    void (*f)(void *);
+    void* params;
+} heartbeat;
+
 // Parser related functions
+/*
+Requires a pointer to a parser state, and the byte to process.
+returns NEW_MESSAGE if a message has been successfully parsed.
+The result can be found in msg_type and msg_payload.
+Parsing another byte will override the contents of those arrays.
+*/
 int parse_byte(parser_state* ps, char byte);
+/*
+Takes a string as input, and converts it to an integer. Stops parsing when reaching
+the end of string or a ","
+the result is undefined if a wrong string is passed
+*/
+int extract_integer(const char* str);
+/*
+The function takes a string, and an index within the string, and returns the index where the next data can be found
+Example: with the string "10,20,30", and i=0 it will return 3. With the same string and i=3, it will return 6.
+*/  
+int next_value(const char* msg, int i);
 
 // LED related functions
 void LigthsSetup();
@@ -62,9 +87,14 @@ void PWMstart(int surge, int yaw_rate);
 
 void cb_push(volatile CircularBuffer *cb, char data);
 
+// Scheduler related functions
+void scheduler(heartbeat schedInfo[], int nTasks);
+void task_control_lights(void* param);
+void task_send_distance(void* param);
+void task_send_battery(void* param);
+void task_send_dutycycle(void* param);
+
 float getDistance();
-void sendDistance();
-void sendBattery();
-void sendDC();
+
 
 #endif	

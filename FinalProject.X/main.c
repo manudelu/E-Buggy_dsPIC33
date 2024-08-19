@@ -5,6 +5,8 @@
 #include <string.h>
 #include <math.h>
 
+#define MAX_TASKS 4
+
 // Define the state machine states
 typedef enum {
     WaitForStart,
@@ -13,6 +15,9 @@ typedef enum {
 
 // Initialize state variable
 volatile State state = WaitForStart;
+
+volatile int yaw_rate = 0;
+volatile int surge = 0;
 
 // Create the CircularBuffer object
 volatile CircularBuffer cb;
@@ -41,31 +46,48 @@ void __attribute__((__interrupt__, __auto_psv__)) _U2RXInterrupt() {
     cb_push(&cb, receivedChar);  // When a new char is received, push it to the circular buffer   
 }
 
+// Task function for controlling lights and indicators
+void task_control_lights(void *params) {
+    static int blink_state = 0;
+    LATAbits.LATA0 = blink_state;
+    
+    if (state == WaitForStart) {
+        LATBbits.LATB8 = blink_state; // Left indicator
+        LATFbits.LATF1 = blink_state; // Right indicator
+        
+        // Turn off other lights
+        LATAbits.LATA7 = 0;  // Beam lights off
+        LATFbits.LATF0 = 0;  // Brakes off
+        LATGbits.LATG1 = 0;  // Low intensity lights off
+    } else if (state == Moving) {        
+        // Indicator control
+        if (yaw_rate > 15) {
+            LATBbits.LATB8 = 0;           // Left indicator off
+            LATFbits.LATF1 = blink_state; // Right indicator blinking
+        } else {
+            LATBbits.LATB8 = 0;           // Left indicator off
+            LATFbits.LATF1 = 0;           // Right indicator off
+        }
+
+        // Lights control
+        if (surge > 50) {
+            LATAbits.LATA7 = 1;  // Beam lights on
+            LATFbits.LATF0 = 0;  // Brakes off
+            LATGbits.LATG1 = 0;  // Low intensity lights off
+        } else {
+            LATAbits.LATA7 = 0;  // Beam lights off
+            LATFbits.LATF0 = 1;  // Brakes on
+            LATGbits.LATG1 = 1;  // Low intensity lights on
+        }
+    }
+
+    // Toggle the blink state for the next cycle
+    blink_state = !blink_state;
+}
+
 int main(void) {
     // Disable analog inputs
     ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000;
-    
-    // Initialize Circular Buffer Variables
-    cb.head = 0;
-    cb.tail = 0;    
-    cb.to_read = 0;
-    
-    char byte;     // Keep track of the received characters
-    int payload;
-    
-    parser_state pstate;
-	pstate.state = STATE_DOLLAR;
-	pstate.index_type = 0; 
-	pstate.index_payload = 0;
-    
-    int surge = 0, yaw_rate = 0;
-    float distance;
-    
-    int blink_timer_buggy = 0;  // Timer for buggy's LED blinking
-    int blink_timer_board = 0;  // Timer for board's LED blinking
-    int uart_timer = 0;
-    
-    int choice = 0;
     
     // Set up peripherals
     PWMsetup(10000);      // Set up the PWM to work at 10kHz
@@ -81,11 +103,40 @@ int main(void) {
     IEC1bits.INT1IE = 1;      // Enable INT1 interrupt
     IEC0bits.T2IE = 1;        // Enable Timer2 Interrupt (?)
     
+    
+    // scheduler configuration
+    heartbeat schedInfo[MAX_TASKS];
+    
+    // Lights Control Task
+    schedInfo[0].n = 0; 
+    schedInfo[0].N = 1000; // 1 Hz
+    schedInfo[0].f = task_control_lights;
+    schedInfo[0].params = NULL;
+    schedInfo[0].enable = 1;
+    // Send Battery Task
+    schedInfo[1].n = 0;
+    schedInfo[1].N = 1000; // 1 Hz
+    schedInfo[1].f = task_send_battery;
+    schedInfo[1].params = NULL;
+    schedInfo[1].enable = 1; 
+    // Send Distance Task
+    schedInfo[2].n = 0;
+    schedInfo[2].N = 10000; // 10 Hz
+    schedInfo[2].f = task_send_distance;
+    schedInfo[2].params = NULL;
+    schedInfo[2].enable = 1;   
+    // Send Duty Cycle Task
+    schedInfo[3].n = 0;
+    schedInfo[3].N = 10000; // 10 Hz
+    schedInfo[3].f = task_send_dutycycle;
+    schedInfo[3].params = NULL;
+    schedInfo[3].enable = 1; 
+    
     // Control loop frequency = 1 kHz (1 ms period)
     tmr_setup_period(TIMER1, 1); 
     
     while(1) {       
-        distance = getDistance();
+        float distance = getDistance();
         
         // ADC sampling
         do{
@@ -97,19 +148,6 @@ int main(void) {
         if (state == WaitForStart) {
             // Set PWM DC of all the motors to 0
             PWMstop();
-            
-            // Turn off lights
-            LATAbits.LATA7 = 0; // Beam Headlights 
-            LATFbits.LATF0 = 0; // Brakes 
-            LATGbits.LATG1 = 0; // Low Intensity Lights 
-            
-            // Buggy LED blinking
-            if (blink_timer_buggy == 1000) {
-                LATBbits.LATB8 = !LATBbits.LATB8;  // Toggle Left Side Light
-                LATFbits.LATF1 = !LATFbits.LATF1;  // Toggle Right Side Light
-                blink_timer_buggy = 0;
-            } 
-            blink_timer_buggy++;
         }
 
         else if (state == Moving) {
@@ -129,50 +167,9 @@ int main(void) {
                 
             // Set PWM DC of all the motors based on the surge and yaw rate
             PWMstart(surge, yaw_rate);
-            
-            // Control lights based on surge
-            if (surge > 50){
-                LATAbits.LATA7 = 1; // Beam Headlights 
-                LATFbits.LATF0 = 0; // Brakes 
-                LATGbits.LATG1 = 0; // Low Intensity Lights 
-            }
-            else{
-                LATAbits.LATA7 = 0; // Beam Headlights 
-                LATFbits.LATF0 = 1; // Brakes 
-                LATGbits.LATG1 = 1; // Low Intensity Lights 
-            }
-            
-            // Control side lights based on yaw_rate
-            if (yaw_rate > 15){
-                LATBbits.LATB8 = 0;
-                if (blink_timer_buggy == 1000){
-                    LATFbits.LATF1 = !LATFbits.LATF1;
-                    blink_timer_buggy = 0;
-                }
-                blink_timer_buggy++;
-            }
-            else{
-                LATBbits.LATB8 = 0;
-                LATFbits.LATF1 = 0;
-                blink_timer_buggy = 0;
-            }
         }
         
-        // Board LED A0 1Hz blinking
-        if (blink_timer_board == 1000){
-            LATAbits.LATA0 = !LATAbits.LATA0;  // Toggle Led1
-            sendBattery();
-            blink_timer_board = 0;
-        }
-        blink_timer_board++;
-        
-        if (uart_timer == 10000){
-            sendDistance();
-            sendDC();
-            uart_timer = 0;
-        }
-        uart_timer++;
-        
+        scheduler(schedInfo, MAX_TASKS);       
         tmr_wait_period(TIMER1);
     }
     
