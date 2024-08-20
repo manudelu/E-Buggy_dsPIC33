@@ -230,48 +230,45 @@ void scheduler(heartbeat schedInfo[], int nTasks)
 }
 
 void task_send_distance(void* param){
-    float ADCValue, V, distance; 
-    ADCValue = ADC1BUF1;        // Get ADC value 
-    V = ADCValue * 3.3/1024.0;         // Convert to voltage
-    distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
+    float ADCValue = ADC1BUF1;        // Get ADC value 
+    float V = ADCValue * 3.3/1024.0;         // Convert to voltage
+    float distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
     
     char buffer[16];
-    sprintf(buffer, "MDIST,%d*\n", (int)distance); // bisogna metter %d* da specifiche
-    for (int i=0; i < strlen(buffer); i++) {
-        while (U2STAbits.UTXBF == 1);  // Wait until the Transmit Buffer is not full 
-        U2TXREG = buffer[i];   
-    }
+    sprintf(buffer, "MDIST,%d*\n", (int)distance); 
+    send_uart(buffer);
 }
 
 void task_send_battery(void* param){
-    float ADCValue, V;
+    float ADCValue = ADC1BUF0;
+    float V = ADCValue * 3.3/1024.0;
     const float R49 = 100.0, R51 = 100.0, R54 = 100.0;
-    ADCValue = ADC1BUF0;
-    V = ADCValue * 3.3/1024.0;
     float Rs = R49 + R51;
     float battery = V * (Rs + R54) / R54;
     
     char buffer[16];
     sprintf(buffer, "$MBATT,%.2f*\n", battery);
-    for (int i = 0; i < strlen(buffer); i++){
-        while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
-        U2TXREG = buffer[i];
-    }
+    send_uart(buffer);
 }
 
 void task_send_dutycycle(void* param){
     // OCxR - Sets the time the signal is high
     // OCxRS - Sets the period of the PWM signal
-    int dc1 = OC1R/OC1RS * 100;  
-    int dc2 = OC2R/OC2RS * 100;
-    int dc3 = OC3R/OC3RS * 100;
-    int dc4 = OC4R/OC4RS * 100;
+    int dc1 = (OC1R * 100) / OC1RS;  
+    int dc2 = (OC2R * 100) / OC2RS;
+    int dc3 = (OC3R * 100) / OC3RS;
+    int dc4 = (OC4R * 100) / OC4RS;
     
     char buffer[16];
     sprintf(buffer, "$MPWM,%d,%d,%d,%d*\n", dc1, dc2, dc3, dc4);
-    for (int i = 0; i < strlen(buffer); i++){
+    send_uart(buffer);
+}
+
+// Utility function to send data over UART
+void send_uart(char* data) {
+    for (int i = 0; i < strlen(data); i++){
         while (U2STAbits.UTXBF == 1); // Wait until the Transmit Buffer is not full
-        U2TXREG = buffer[i];
+        U2TXREG = data[i];
     }
 }
 

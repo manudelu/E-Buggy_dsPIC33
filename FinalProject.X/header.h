@@ -79,6 +79,7 @@ void ADCsetup();
 
 // UART related functions
 void UARTsetup();
+void send_uart(char* data);
 
 // PWM related functions
 void PWMsetup(int PWM_freq);

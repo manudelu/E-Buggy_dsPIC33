@@ -102,8 +102,7 @@ int main(void) {
     IFS1bits.INT1IF = 0;      // Clear INT1 interrupt flag
     IEC1bits.INT1IE = 1;      // Enable INT1 interrupt
     IEC0bits.T2IE = 1;        // Enable Timer2 Interrupt (?)
-    
-    
+     
     // scheduler configuration
     heartbeat schedInfo[MAX_TASKS];
     
@@ -145,28 +144,28 @@ int main(void) {
         }while(!AD1CON1bits.DONE);         // Wait for sampling completion
          
         // State machine handling
-        if (state == WaitForStart) {
-            // Set PWM DC of all the motors to 0
-            PWMstop();
-        }
-
-        else if (state == Moving) {
-            // Calculate surge and yaw_rate based on distance
-            if (distance < MINTH) {
-                surge = 0;
-                yaw_rate = 100;
-            } else if (distance > MAXTH) {
-                surge = 100;
-                yaw_rate = 0;
-            } else {
-                // Set proportional control parameters
-                const int s = 2, y = 1000;
-                surge = distance * s; 
-                yaw_rate = y / distance;
-            }
+        switch(state) {
+            case WaitForStart:
+                PWMstop();  // Stop motors when waiting for start
+                break;
+            
+            case Moving:
+                if (distance < MINTH) {
+                    surge = 0;
+                    yaw_rate = 100;
+                } else if (distance > MAXTH) {
+                    surge = 100;
+                    yaw_rate = 0;
+                } else {
+                    // Set proportional control parameters
+                    const int s = 2, y = 1000;
+                    surge = distance * s; 
+                    yaw_rate = y / distance;
+                }
                 
-            // Set PWM DC of all the motors based on the surge and yaw rate
-            PWMstart(surge, yaw_rate);
+                // Set PWM duty cycle based on surge and yaw rate
+                PWMstart(surge, yaw_rate);
+                break;
         }
         
         scheduler(schedInfo, MAX_TASKS);       
