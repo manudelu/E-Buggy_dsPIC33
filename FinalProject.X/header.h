@@ -14,6 +14,9 @@
 #define MINTH 25      // Minimum distance threshold
 #define MAXTH 50      // Maximum distance threshold
 
+#define DISTANCE (1)
+#define BATTERY (0)
+
 #define STATE_DOLLAR  (1) // we discard everything until a dollar is found
 #define STATE_TYPE    (2) // we are reading the type of msg until a comma is found
 #define STATE_PAYLOAD (3) // we read the payload until an asterix is found
@@ -76,6 +79,7 @@ void tmr_wait_ms(int timer, int ms);
 
 // ADC related functions
 void ADCsetup();
+float getMeasurements(int flag);
 
 // UART related functions
 void UARTsetup();
@@ -94,8 +98,5 @@ void task_control_lights(void* param);
 void task_send_distance(void* param);
 void task_send_battery(void* param);
 void task_send_dutycycle(void* param);
-
-float getDistance();
-
 
 #endif	

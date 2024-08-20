@@ -134,14 +134,14 @@ int main(void) {
     // Control loop frequency = 1 kHz (1 ms period)
     tmr_setup_period(TIMER1, 1); 
     
-    while(1) {       
-        float distance = getDistance();
-        
+    while(1) {             
         // ADC sampling
         do{
             if (AD1CON1bits.SAMP == 0)
                 AD1CON1bits.SAMP = 1;      // Start sampling
         }while(!AD1CON1bits.DONE);         // Wait for sampling completion
+        
+        float distance = getMeasurements(DISTANCE);
          
         // State machine handling
         switch(state) {

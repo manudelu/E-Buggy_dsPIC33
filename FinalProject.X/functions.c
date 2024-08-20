@@ -208,13 +208,24 @@ void PWMstart(int surge, int yaw_rate){
     }
 }
 
-float getDistance(){
-    float ADCValue, V, distance; 
-    ADCValue = ADC1BUF1;        // Get ADC value 
-    V = ADCValue * 3.3/1024.0;         // Convert to voltage
-    distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
-    
-    return distance;
+// Read IR or Battery sensor tension
+float getMeasurements(int flag){
+    float ADCValue, V;
+    if(flag){
+        ADCValue = ADC1BUF1;        // Get ADC value 
+        V = ADCValue * 3.3/1024.0;  // Convert to voltage
+        float distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
+        return distance;
+    }
+    else{
+        ADCValue = ADC1BUF0;
+        V = ADCValue * 3.3/1024.0;
+        const float R49 = 100.0, R51 = 100.0, R54 = 100.0;
+        float Rs = R49 + R51;
+        float battery = V * (Rs + R54) / R54;
+        return battery;
+    }
+   
 }
 
 void scheduler(heartbeat schedInfo[], int nTasks) 
@@ -230,9 +241,7 @@ void scheduler(heartbeat schedInfo[], int nTasks)
 }
 
 void task_send_distance(void* param){
-    float ADCValue = ADC1BUF1;        // Get ADC value 
-    float V = ADCValue * 3.3/1024.0;         // Convert to voltage
-    float distance = 100 * (2.34 - 4.74 * V + 4.06 * powf(V,2) - 1.60 * powf(V,3) + 0.24 * powf(V,4));
+    float distance = getMeasurements(DISTANCE);
     
     char buffer[16];
     sprintf(buffer, "MDIST,%d*\n", (int)distance); 
@@ -240,11 +249,7 @@ void task_send_distance(void* param){
 }
 
 void task_send_battery(void* param){
-    float ADCValue = ADC1BUF0;
-    float V = ADCValue * 3.3/1024.0;
-    const float R49 = 100.0, R51 = 100.0, R54 = 100.0;
-    float Rs = R49 + R51;
-    float battery = V * (Rs + R54) / R54;
+    float battery = getMeasurements(BATTERY);
     
     char buffer[16];
     sprintf(buffer, "$MBATT,%.2f*\n", battery);
