@@ -65,17 +65,6 @@ void tmr_wait_period(int timer){
     }
 }
 
-// Wait for a specified number of milliseconds using a timer
-void tmr_wait_ms(int timer, int ms){
-    while (ms > MaxTime) {
-        tmr_setup_period(timer, MaxTime); 
-        tmr_wait_period(timer);
-        ms -= MaxTime;
-    }
-    tmr_setup_period(timer, ms); 
-    tmr_wait_period(timer); 
-}
-
 // Set all buggy's lights as output
 void LigthsSetup(void) {
     TRISAbits.TRISA0 = 0; // Led1 (RA0) 
@@ -84,6 +73,10 @@ void LigthsSetup(void) {
     TRISAbits.TRISA7 = 0; // Beam Headlights (RA7)
     TRISFbits.TRISF0 = 0; // Brakes (RF0)
     TRISGbits.TRISG1 = 0; // Low Intensity Lights (RG1)
+}
+
+void task_blinkA0 (void* param) {
+    LATAbits.LATA0 = !LATAbits.LATA0;
 }
 
 // Function to setup the ADC
@@ -99,7 +92,7 @@ void ADCsetup(void) {
     TRISBbits.TRISB11 = 1;
     ANSELBbits.ANSB11 = 1;
     
-    AD1CON3bits.ADCS = 14;  // Tad = 8*Tcy = 8/72MHz = 111.11ns
+    AD1CON3bits.ADCS = 14;  // Tad = 8*Tcf8/72MHz = 111.11ns
     AD1CON1bits.ASAM = 0;   // Manual sampling
     AD1CON1bits.SSRC = 7;   // Automatic conversion
     AD1CON3bits.SAMC = 16;  // Sampling lasts 16 Tad 
@@ -194,7 +187,8 @@ void PWMstart(int surge, int yaw_rate){
     if (left_pwm > 0) {
         OC1R = 0; 
         OC2R = left_pwm/100 * OC2RS; 
-    } else {
+    } 
+    else {
         OC1R = (-left_pwm/100) * OC1RS; 
         OC2R = 0; 
     }
@@ -202,7 +196,8 @@ void PWMstart(int surge, int yaw_rate){
     if (right_pwm > 0) {
         OC3R = 0; 
         OC4R = right_pwm/100 * OC4RS;
-    } else {
+    } 
+    else {
         OC3R = (-right_pwm/100) * OC3RS;
         OC4R = 0; 
     }
@@ -259,10 +254,10 @@ void task_send_battery(void* param){
 void task_send_dutycycle(void* param){
     // OCxR - Sets the time the signal is high
     // OCxRS - Sets the period of the PWM signal
-    int dc1 = (OC1R * 100) / OC1RS;  
-    int dc2 = (OC2R * 100) / OC2RS;
-    int dc3 = (OC3R * 100) / OC3RS;
-    int dc4 = (OC4R * 100) / OC4RS;
+    int dc1 = (int)(((float)OC1R / (float)OC1RS) * 100);
+    int dc2 = (int)(((float)OC2R / (float)OC2RS) * 100);
+    int dc3 = (int)(((float)OC3R / (float)OC3RS) * 100);
+    int dc4 = (int)(((float)OC4R / (float)OC4RS) * 100);
     
     char buffer[16];
     sprintf(buffer, "$MPWM,%d,%d,%d,%d*\n", dc1, dc2, dc3, dc4);
@@ -277,6 +272,8 @@ void send_uart(char* data) {
     }
 }
 
+// Requires a pointer to a parser state, and the byte to process. returns NEW_MESSAGE if a message has been successfully parsed.
+// The result can be found in msg_type and msg_payload. Parsing another byte will override the contents of those arrays.
 int parse_byte(parser_state* ps, char byte) {
     switch (ps->state) {
         case STATE_DOLLAR:
@@ -320,6 +317,8 @@ int parse_byte(parser_state* ps, char byte) {
     return NO_MESSAGE;
 }
 
+// Takes a string as input, and converts it to an integer. Stops parsing when reaching
+// the end of string or a "," the result is undefined if a wrong string is passed
 int extract_integer(const char* str) {
 	int i = 0, number = 0, sign = 1;
 	
@@ -339,6 +338,8 @@ int extract_integer(const char* str) {
 	return sign*number;
 }		
 
+// The function takes a string, and an index within the string, and returns the index where the next data can be found
+// Example: with the string "10,20,30", and i=0 it will return 3. With the same string and i=3, it will return 6.
 int next_value(const char* msg, int i) {
 	while (msg[i] != ',' && msg[i] != '\0') { i++; }
 	if (msg[i] == ',')
@@ -357,5 +358,18 @@ void cb_push(volatile CircularBuffer *cb, char data) {
     if (cb->head == BUFFER_SIZE)
         cb->head = 0;             
 }
+
+// Function to pop data from the circular buffer
+int cb_pop(volatile CircularBuffer *cb, char *data) {
+    if (cb->to_read == 0)           // If there are no chars that can be read
+        return 0;                   // Return 0 to indicate a failed pop 
+    
+    *data = cb->buffer[cb->tail];   // Read the data from the buffer at the current tail position
+    cb->tail = (cb->tail + 1) % BUFFER_SIZE; // Wrap around to the beginning if we've reached the end of the buffer
+    cb->to_read--;
+    
+    return 1;                       // Return 1 to indicate a successful pop
+}
+
 
 
