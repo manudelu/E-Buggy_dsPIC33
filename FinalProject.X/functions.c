@@ -100,9 +100,9 @@ void ADCsetup(void){
     AD1CON1bits.ASAM = 0;   // Manual sampling
     AD1CON1bits.SSRC = 7;   // Automatic conversion
     AD1CON3bits.SAMC = 16;  // Sampling lasts 16 Tad 
-    AD1CON2bits.CHPS = 0;   // Use 1-channel (CH0) mode
     AD1CON1bits.SIMSAM = 0; // Sequential sampling
-    
+	
+    AD1CON2bits.CHPS = 0;   // Use 1-channel (CH0) mode
     AD1CON2bits.CSCNA = 1;  // Scan mode enabled
     AD1CSSLbits.CSS15 = 1;  // Scan for AN15 IR sensor
     AD1CSSLbits.CSS11 = 1;  // Scan for AN11 Battery sensor
