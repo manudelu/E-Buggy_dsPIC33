@@ -1,3 +1,8 @@
+/*
+ * File:   main.c
+ * Authors: Delucchi Manuel S4803977, Matteo Cappellini S4822622
+ */
+
 #include "xc.h"
 #include "header.h"
 #include <stdio.h>
@@ -5,28 +10,24 @@
 #include <string.h>
 #include <math.h>
 
-int MINTH = 25;      // Minimum distance threshold
-int MAXTH = 50;      // Maximum distance threshold 
+int MINTH = 25;   // Minimum distance threshold
+int MAXTH = 50;    // Maximum distance threshold
 
-// Initialize state variable
-volatile State state = WaitForStart;
-
-// Create the CircularBuffer object
-volatile CircularBuffer cb;
-
+volatile State state = WaitForStart;  
+volatile CircularBuffer cb;  
 volatile int yaw_rate = 0; 
 volatile int surge = 0;
 
 // Interrupt Service Routine for INT1 
 void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){  
-    IFS1bits.INT1IF = 0;            // Clear interrupt flag
+    IFS1bits.INT1IF = 0;            
     tmr_setup_period(TIMER2, 10);   
 }
 
 // Interrupt Service Routine for Timer2
 void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
-    IFS0bits.T2IF = 0;   // Clear Timer2 interrupt flag
-    T2CONbits.TON = 0;   // Stop timer 2
+    IFS0bits.T2IF = 0;  
+    T2CONbits.TON = 0;   
     
     // Toggle the state based on RE8 button
     if(PORTEbits.RE8 == 1){
@@ -38,7 +39,7 @@ void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
 void __attribute__((__interrupt__, __auto_psv__)) _U2RXInterrupt() {
     IFS1bits.U2RXIF = 0;         // Reset UART2 Receiver Interrupt Flag Status bit
     char receivedChar = U2RXREG; // Get char from UART2 received REG
-    cb_push(&cb, receivedChar);  // When a new char is received, push it to the circular buffer  
+    cb_push(&cb, receivedChar);  // Push it to the circular buffer  
 }
 
 int main(void) {
@@ -46,44 +47,46 @@ int main(void) {
     ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000;
     
     // Set up peripherals
-    PWMsetup(10000);      // Set up the PWM to work at 10kHz
+    PWMsetup(10000);   // Set up PWM at 10kHz
     LigthsSetup();
     ADCsetup();
     UARTsetup();
     
     char readChar;     // Keep track of the received characters
-    int i = 0;         // Read both payloads from parser
+    int i = 0;         // For reading payloads from parser
     
-    // Initialize Circular Buffer Variables
+    // Initialize CircularBuffer Variables
     cb.head = 0;
     cb.tail = 0; 
     cb.to_read = 0;
     
-    // Initialize Parser
+    // Initialize ParserState
     parser_state pstate;
-	pstate.state = STATE_DOLLAR;
-	pstate.index_type = 0; 
-	pstate.index_payload = 0;
+    pstate.state = STATE_DOLLAR;
+    pstate.index_type = 0;
+    pstate.index_payload = 0;
     
     // Configure INT1 (mapped to RE8)
     TRISEbits.TRISE8 = 1;     // Set RE8 as input
     RPINR0bits.INT1R = 0x58;  // Remap RE8 to INT1 (RPI88 -> 0x58)
     INTCON2bits.GIE = 1;      // Enable global interrupts
     IFS1bits.INT1IF = 0;      // Clear INT1 interrupt flag
+    
+    // Enable Interrupts
     IEC1bits.INT1IE = 1;      // Enable INT1 interrupt
-    IEC0bits.T2IE = 1;        // Enable Timer2 Interrupt (?)
+    IEC0bits.T2IE = 1;        // Enable Timer2 Interrupt 
     IEC1bits.U2RXIE = 1;      // enable interrupt for UART    
      
-    // scheduler configuration
+    // Scheduler configuration
     heartbeat schedInfo[MAX_TASKS];
     
-    // Board Led0 Constant Blink
+    // LedA0 Blinking Task
     schedInfo[0].n = 0; 
     schedInfo[0].N = 1000; // 1 Hz
     schedInfo[0].f = task_blinkA0;
     schedInfo[0].params = NULL;
     schedInfo[0].enable = 1;
-    // Lights Control Task
+    // Left and Right Indicators Blinking Task
     schedInfo[1].n = 0; 
     schedInfo[1].N = 1000; // 1 Hz
     schedInfo[1].f = task_blink_indicators;
@@ -120,8 +123,7 @@ int main(void) {
         
         float distance = getMeasurements(DISTANCE);
         
-        if (cb.to_read > 0) {
-                        
+        if (cb.to_read > 0) {          
             IEC1bits.U2RXIE = 0;                // Disable UART2 Receiver Interrupt
             int read = cb_pop(&cb, &readChar);  // Pop data from buffer
             IEC1bits.U2RXIE = 1;                // Enable UART2 Receiver Interrupt
@@ -131,16 +133,14 @@ int main(void) {
                                 
                 int ret = parse_byte(&pstate, readChar);
                 if (ret == NEW_MESSAGE) {                    
-                    if (strcmp(pstate.msg_type, "PCTH") == 0) { // if the buffer is identical to byte
-                        
+                    if (strcmp(pstate.msg_type, "PCTH") == 0) { 
                         MINTH = extract_integer(pstate.msg_payload);
                         i = next_value(pstate.msg_payload, i);
-                        MAXTH = extract_integer(pstate.msg_payload + i);
-                        
-                        send_uart("OK");        // check correctness of the message                   
+                        MAXTH = extract_integer(pstate.msg_payload + i); 
+                        //send_uart("OK");                           
                     }
                     else {
-                        send_uart("ERR");      // check correctness of the message 
+                        //send_uart("ERR");     
                     }
                 }                
             }
@@ -185,6 +185,14 @@ int main(void) {
                     LATGbits.LATG1 = 1;  // Low intensity lights on
                 }
                 
+                if (yaw_rate > 15) {
+                    LATBbits.LATB8 = 0;  // Left indicator off
+                } 
+                else {
+                    LATBbits.LATB8 = 0;  // Left indicator off
+                    LATFbits.LATF1 = 0;  // Right indicator off
+                }
+                
                 // Set PWM duty cycle based on surge and yaw rate
                 PWMstart(surge, yaw_rate);
                 break;
@@ -199,18 +207,11 @@ int main(void) {
 
 void task_blink_indicators (void* param) {
     if (state == WaitForStart) {
-        LATFbits.LATF1 = !LATFbits.LATF1;
-        LATBbits.LATB8 = !LATBbits.LATB8;
+        LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
+        LATBbits.LATB8 = !LATBbits.LATB8; // Left indicator blinking
     }
     else if (state == Moving) {
-        // Indicator control
-        if (yaw_rate > 15) {
-            LATBbits.LATB8 = 0;           // Left indicator off
+        if (yaw_rate > 15)
             LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
-        } 
-        else {
-            LATBbits.LATB8 = 0;           // Left indicator off
-            LATFbits.LATF1 = 0;           // Right indicator off
-        }
     }
 }

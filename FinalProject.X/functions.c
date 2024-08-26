@@ -1,3 +1,8 @@
+/*
+ * File:   functions.c
+ * Authors: Delucchi Manuel S4803977, Matteo Cappellini S4822622
+ */
+
 #include "xc.h"
 #include "header.h"
 #include <math.h>
@@ -31,7 +36,7 @@ void tmr_setup_period(int timer, int ms){
     }
    
     // Configure the specified timer
-    switch(timer) {
+    switch(timer){
         case TIMER1: 
             TMR1 = 0;               // Reset timer counter
             T1CONbits.TON = 0;      // Stops the timer
@@ -55,18 +60,18 @@ void tmr_wait_period(int timer){
     switch(timer){
         case TIMER1:
             while(IFS0bits.T1IF == 0){};
-            IFS0bits.T1IF = 0; // Reset Timer1 interrupt flag
+            IFS0bits.T1IF = 0; 
             break;
             
         case TIMER2:
             while(IFS0bits.T2IF == 0){};
-            IFS0bits.T2IF = 0; // Reset Timer2 interrupt flag
+            IFS0bits.T2IF = 0; 
             break;
     }
 }
 
 // Set all buggy's lights as output
-void LigthsSetup(void) {
+void LigthsSetup(void){
     TRISAbits.TRISA0 = 0; // Led1 (RA0) 
     TRISBbits.TRISB8 = 0; // Left Side Lights (RB8)
     TRISFbits.TRISF1 = 0; // Right Side Lights (RF1)
@@ -75,18 +80,17 @@ void LigthsSetup(void) {
     TRISGbits.TRISG1 = 0; // Low Intensity Lights (RG1)
 }
 
-void task_blinkA0 (void* param) {
+void task_blinkA0 (void* param){
     LATAbits.LATA0 = !LATAbits.LATA0;
 }
 
 // Function to setup the ADC
-void ADCsetup(void) {
-    // IR Sensor analog configuration AN15 (mounted on front left mikroBUS)
+void ADCsetup(void){
+    // IR Sensor analog configuration AN15 
     TRISBbits.TRISB15 = 1;
     ANSELBbits.ANSB15 = 1; 
-    
-    TRISAbits.TRISA3 = 0; // IR distance sensor enable line  
-    LATAbits.LATA3 = 1; // enable EN pin
+    TRISAbits.TRISA3 = 0; // IR sensor enable line  
+    LATAbits.LATA3 = 1;   // Enable pin
     
     // Enable Battery Sensor analog configuration AN11
     TRISBbits.TRISB11 = 1;
@@ -100,7 +104,7 @@ void ADCsetup(void) {
     AD1CON1bits.SIMSAM = 0; // Sequential sampling
     
     AD1CON2bits.CSCNA = 1;  // Scan mode enabled
-    AD1CSSLbits.CSS15 = 1;  // Scan for AN14 IR sensor
+    AD1CSSLbits.CSS15 = 1;  // Scan for AN15 IR sensor
     AD1CSSLbits.CSS11 = 1;  // Scan for AN11 Battery sensor
     AD1CON2bits.SMPI = 1;   // N-1 channels
     
@@ -223,8 +227,7 @@ float getMeasurements(int flag){
    
 }
 
-void scheduler(heartbeat schedInfo[], int nTasks) 
-{
+void scheduler(heartbeat schedInfo[], int nTasks){
     int i;
     for (i = 0; i < nTasks; i++) {
         schedInfo[i].n++;
