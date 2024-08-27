@@ -15,23 +15,21 @@
 // Timer Configuration
 #define TIMER1 1
 #define TIMER2 2
-#define MaxInt 65535    // Max number that can be represented with 16bit register 
-
-// Buffer and Task Configuration
-#define BUFFER_SIZE 13   
-// 9.6 byte/s -> 10 is just enough, 13: final size of cb (10 + 25%(10))
-#define MAX_TASKS 5
+#define MaxInt 65535  // Max number that can be represented with 16bit register 
 
 // Message Parsing States
-#define STATE_DOLLAR  (1) // we discard everything until a dollar is found
-#define STATE_TYPE    (2) // we are reading the type of msg until a comma is found
-#define STATE_PAYLOAD (3) // we read the payload until an asterix is found
-#define NEW_MESSAGE (1)   // new message received and parsed completely
-#define NO_MESSAGE (0)    // no new messages
+#define STATE_DOLLAR  1 // we discard everything until a dollar is found
+#define STATE_TYPE    2 // we are reading the type of msg until a comma is found
+#define STATE_PAYLOAD 3 // we read the payload until an asterix is found
+#define NEW_MESSAGE   1 // new message received and parsed completely
+#define NO_MESSAGE    0 // no new messages
 
 // Measurement Flags
-#define DISTANCE (1)
-#define BATTERY (0)
+#define DISTANCE 1
+#define BATTERY  0
+
+#define BUFFER_SIZE 13  // 9.6 byte/s -> 10 is just enough, 13: final size of cb (10 + 25%(10)) 
+#define MAX_TASKS 5
 
 // State Machine States
 typedef enum {
@@ -39,6 +37,7 @@ typedef enum {
     Moving
 } State;
 
+// Control Data Structure
 typedef struct {
     int MINTH;
     int MAXTH;
@@ -87,7 +86,7 @@ float getMeasurements(int flag);
 // PWM related functions
 void PWMsetup(int PWM_freq);
 void PWMstop();
-void PWMstart(ControlData* ctrl_data);
+void PWMstart(ControlData* data);
 
 // UART related functions
 void UARTsetup();

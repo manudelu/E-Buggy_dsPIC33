@@ -43,24 +43,25 @@ int main(void) {
     ANSELA = ANSELB = ANSELC = ANSELD = ANSELE = ANSELG = 0x0000;
     
     // Set up peripherals
-    PWMsetup(10000);   // Set up PWM at 10kHz
     LigthsSetup();
+    PWMsetup(10000);  // Set up PWM at 10kHz
     ADCsetup();
     UARTsetup();
     
     char readChar;     // Keep track of the received characters
     int i = 0;         // For reading payloads from parser
     
-    // Initialize CircularBuffer Variables
+    // Initialize CircularBuffer
     cb.head = 0;
     cb.tail = 0; 
     cb.to_read = 0;
     
     // Initialize ParserState
-    parser_state pstate;
-    pstate.state = STATE_DOLLAR;
-    pstate.index_type = 0;
-    pstate.index_payload = 0;
+    parser_state pstate = {
+        .state = STATE_DOLLAR,
+        .index_type = 0,
+        .index_payload = 0
+    };
     
     // Configure INT1 (mapped to RE8)
     TRISEbits.TRISE8 = 1;     // Set RE8 as input
@@ -74,38 +75,22 @@ int main(void) {
     IEC1bits.U2RXIE = 1;      // enable interrupt for UART    
      
     // Scheduler configuration
-    heartbeat schedInfo[MAX_TASKS];
-    
-    // LedA0 Blinking Task
-    schedInfo[0].n = 0; 
-    schedInfo[0].N = 1000; // 1 Hz
-    schedInfo[0].f = task_blinkA0;
-    schedInfo[0].params = NULL;
-    schedInfo[0].enable = 1;
-    // Left and Right Indicators Blinking Task
-    schedInfo[1].n = 0; 
-    schedInfo[1].N = 1000; // 1 Hz
-    schedInfo[1].f = task_blink_indicators;
-    schedInfo[1].params = &control_data;;
-    schedInfo[1].enable = 1;
-    // Send Battery Task
-    schedInfo[2].n = 0;
-    schedInfo[2].N = 1000; // 1 Hz
-    schedInfo[2].f = task_send_battery;
-    schedInfo[2].params = NULL;
-    schedInfo[2].enable = 1; 
-    // Send Distance Task
-    schedInfo[3].n = 0;
-    schedInfo[3].N = 10000; // 10 Hz
-    schedInfo[3].f = task_send_distance;
-    schedInfo[3].params = NULL;
-    schedInfo[3].enable = 1;   
-    // Send Duty Cycle Task
-    schedInfo[4].n = 0;
-    schedInfo[4].N = 10000; // 10 Hz
-    schedInfo[4].f = task_send_dutycycle;
-    schedInfo[4].params = NULL;
-    schedInfo[4].enable = 1; 
+    heartbeat schedInfo[MAX_TASKS] = {
+        // LedA0 Blinking Task
+        { .n = 0, .N = 1000, .f = task_blinkA0, .params = NULL, .enable = 1 },
+        
+        // Left and Right Indicators Blinking Task
+        { .n = 0, .N = 1000, .f = task_blink_indicators, .params = &control_data, .enable = 1 },
+        
+        // Send Battery Task
+        { .n = 0, .N = 1000, .f = task_send_battery, .params = NULL, .enable = 1 },
+        
+        // Send Distance Task
+        { .n = 0, .N = 10000, .f = task_send_distance, .params = NULL, .enable = 1 },
+        
+        // Send Duty Cycle Task
+        { .n = 0, .N = 10000, .f = task_send_dutycycle, .params = NULL, .enable = 1 }
+    };
     
     // Control loop frequency = 1 kHz (1 ms period)
     tmr_setup_period(TIMER1, 1); 
@@ -133,9 +118,10 @@ int main(void) {
                         control_data.MINTH = extract_integer(pstate.msg_payload);
                         i = next_value(pstate.msg_payload, i);
                         control_data.MAXTH = extract_integer(pstate.msg_payload + i); 
+                        // Optionally send confirmation over UART
                         //send_uart("OK");                           
-                    }
-                    else {
+                    } else {
+                        // Optionally send error over UART
                         //send_uart("ERR");     
                     }
                 }                
@@ -157,16 +143,15 @@ int main(void) {
                 if (distance < control_data.MINTH) {
                     control_data.surge = 0;
                     control_data.yaw_rate = 100;
-                } 
-                else if (distance > control_data.MAXTH) {
+                } else if (distance > control_data.MAXTH) {
                     control_data.surge = 100;
                     control_data.yaw_rate = 0;
-                } 
-                else {
-                    // Set proportional control parameters
-                    const int s = 2, y = 500;
-                    control_data.surge = distance * s; 
-                    control_data.yaw_rate = y / distance;
+                } else {
+                    // Proportional control parameters
+                    const int surgeGain = 2, yawScale = 500;
+
+                    control_data.surge = distance * surgeGain; 
+                    control_data.yaw_rate = yawScale / distance;
                 }
                 
                 // Lights control
@@ -174,8 +159,7 @@ int main(void) {
                     LATAbits.LATA7 = 1;  // Beam lights on
                     LATFbits.LATF0 = 0;  // Brakes off
                     LATGbits.LATG1 = 0;  // Low intensity lights off
-                } 
-                else {
+                } else {
                     LATAbits.LATA7 = 0;  // Beam lights off
                     LATFbits.LATF0 = 1;  // Brakes on
                     LATGbits.LATG1 = 1;  // Low intensity lights on
@@ -183,8 +167,7 @@ int main(void) {
                 
                 if (control_data.yaw_rate > 15) {
                     LATBbits.LATB8 = 0;  // Left indicator off
-                } 
-                else {
+                } else {
                     LATBbits.LATB8 = 0;  // Left indicator off
                     LATFbits.LATF1 = 0;  // Right indicator off
                 }

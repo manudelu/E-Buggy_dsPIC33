@@ -87,14 +87,14 @@ void task_blinkA0 (void* param){
 
 // Function to make Left and Right Indicators blink
 void task_blink_indicators (void* param) {
-    ControlData* ctrl_data = (ControlData*)param;
+    ControlData* data = (ControlData*)param;
     
-    if (ctrl_data->state == WaitForStart) {
+    if (data->state == WaitForStart) {
         LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
         LATBbits.LATB8 = !LATBbits.LATB8; // Left indicator blinking
     }
-    else if (ctrl_data->state == Moving) {
-        if (ctrl_data->yaw_rate > 15)
+    else if (data->state == Moving) {
+        if (data->yaw_rate > 15)
             LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
     }
 }
@@ -111,7 +111,7 @@ void ADCsetup(void){
     TRISBbits.TRISB11 = 1;
     ANSELBbits.ANSB11 = 1;
     
-    AD1CON3bits.ADCS = 14;  // Tad = 8*Tcf8/72MHz = 111.11ns
+    AD1CON3bits.ADCS = 14;  // Select Tad
     AD1CON1bits.ASAM = 0;   // Manual sampling
     AD1CON1bits.SSRC = 7;   // Automatic conversion
     AD1CON3bits.SAMC = 16;  // Sampling lasts 16 Tad 
@@ -190,10 +190,10 @@ void PWMstop(void){
 }
 
 // Function to start PWM and control motor direction
-void PWMstart(ControlData* ctrl_data){  
+void PWMstart(ControlData* data){  
     // Calculate left and right PWM values
-    float left_pwm = ctrl_data->surge + ctrl_data->yaw_rate;
-    float right_pwm = ctrl_data->surge - ctrl_data->yaw_rate;
+    float left_pwm = data->surge + data->yaw_rate;
+    float right_pwm = data->surge - data->yaw_rate;
     
     // Normalize PWM values to ensure they are within the range -100% to 100%
     float max_pwm = fmax(fabs(left_pwm), fabs(right_pwm));
