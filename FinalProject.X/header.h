@@ -65,6 +65,9 @@ typedef enum {
     Moving
 } State;
 
+extern volatile State state;
+extern volatile int yaw_rate;
+
 // LED related functions
 void LigthsSetup();
 

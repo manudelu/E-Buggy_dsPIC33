@@ -100,9 +100,9 @@ void ADCsetup(void){
     AD1CON1bits.ASAM = 0;   // Manual sampling
     AD1CON1bits.SSRC = 7;   // Automatic conversion
     AD1CON3bits.SAMC = 16;  // Sampling lasts 16 Tad 
-    AD1CON1bits.SIMSAM = 0; // Sequential sampling
-	
     AD1CON2bits.CHPS = 0;   // Use 1-channel (CH0) mode
+    AD1CON1bits.SIMSAM = 0; // Sequential sampling
+    
     AD1CON2bits.CSCNA = 1;  // Scan mode enabled
     AD1CSSLbits.CSS15 = 1;  // Scan for AN15 IR sensor
     AD1CSSLbits.CSS11 = 1;  // Scan for AN11 Battery sensor
@@ -374,5 +374,14 @@ int cb_pop(volatile CircularBuffer *cb, char *data) {
     return 1;                       // Return 1 to indicate a successful pop
 }
 
-
+void task_blink_indicators (void* param) {
+    if (state == WaitForStart) {
+        LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
+        LATBbits.LATB8 = !LATBbits.LATB8; // Left indicator blinking
+    }
+    else if (state == Moving) {
+        if (yaw_rate > 15)
+            LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
+    }
+}
 

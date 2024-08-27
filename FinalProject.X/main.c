@@ -204,14 +204,3 @@ int main(void) {
     
     return 0;
 }
-
-void task_blink_indicators (void* param) {
-    if (state == WaitForStart) {
-        LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
-        LATBbits.LATB8 = !LATBbits.LATB8; // Left indicator blinking
-    }
-    else if (state == Moving) {
-        if (yaw_rate > 15)
-            LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
-    }
-}
