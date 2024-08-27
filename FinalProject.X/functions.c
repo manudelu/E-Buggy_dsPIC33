@@ -80,8 +80,23 @@ void LigthsSetup(void){
     TRISGbits.TRISG1 = 0; // Low Intensity Lights (RG1)
 }
 
+// Function to make LedA0 blink
 void task_blinkA0 (void* param){
     LATAbits.LATA0 = !LATAbits.LATA0;
+}
+
+// Function to make Left and Right Indicators blink
+void task_blink_indicators (void* param) {
+    ControlData* ctrl_data = (ControlData*)param;
+    
+    if (ctrl_data->state == WaitForStart) {
+        LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
+        LATBbits.LATB8 = !LATBbits.LATB8; // Left indicator blinking
+    }
+    else if (ctrl_data->state == Moving) {
+        if (ctrl_data->yaw_rate > 15)
+            LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
+    }
 }
 
 // Function to setup the ADC
@@ -175,10 +190,10 @@ void PWMstop(void){
 }
 
 // Function to start PWM and control motor direction
-void PWMstart(int surge, int yaw_rate){  
+void PWMstart(ControlData* ctrl_data){  
     // Calculate left and right PWM values
-    float left_pwm = surge + yaw_rate;
-    float right_pwm = surge - yaw_rate;
+    float left_pwm = ctrl_data->surge + ctrl_data->yaw_rate;
+    float right_pwm = ctrl_data->surge - ctrl_data->yaw_rate;
     
     // Normalize PWM values to ensure they are within the range -100% to 100%
     float max_pwm = fmax(fabs(left_pwm), fabs(right_pwm));
@@ -372,16 +387,5 @@ int cb_pop(volatile CircularBuffer *cb, char *data) {
     cb->to_read--;
     
     return 1;                       // Return 1 to indicate a successful pop
-}
-
-void task_blink_indicators (void* param) {
-    if (state == WaitForStart) {
-        LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
-        LATBbits.LATB8 = !LATBbits.LATB8; // Left indicator blinking
-    }
-    else if (state == Moving) {
-        if (yaw_rate > 15)
-            LATFbits.LATF1 = !LATFbits.LATF1; // Right indicator blinking
-    }
 }
 

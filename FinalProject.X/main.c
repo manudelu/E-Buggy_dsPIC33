@@ -10,13 +10,8 @@
 #include <string.h>
 #include <math.h>
 
-int MINTH = 25;   // Minimum distance threshold
-int MAXTH = 50;    // Maximum distance threshold
-
-volatile State state = WaitForStart;  
-volatile CircularBuffer cb;  
-volatile int yaw_rate = 0; 
-volatile int surge = 0;
+volatile ControlData control_data = {25, 50, 0, 0, WaitForStart};
+volatile CircularBuffer cb;
 
 // Interrupt Service Routine for INT1 
 void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){  
@@ -31,7 +26,7 @@ void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
     
     // Toggle the state based on RE8 button
     if(PORTEbits.RE8 == 1){
-        state = (state == WaitForStart) ? Moving : WaitForStart;
+        control_data.state = (control_data.state == WaitForStart) ? Moving : WaitForStart;
     }
 }
 
@@ -90,7 +85,7 @@ int main(void) {
     schedInfo[1].n = 0; 
     schedInfo[1].N = 1000; // 1 Hz
     schedInfo[1].f = task_blink_indicators;
-    schedInfo[1].params = NULL;
+    schedInfo[1].params = &control_data;;
     schedInfo[1].enable = 1;
     // Send Battery Task
     schedInfo[2].n = 0;
@@ -134,9 +129,9 @@ int main(void) {
                 int ret = parse_byte(&pstate, readChar);
                 if (ret == NEW_MESSAGE) {                    
                     if (strcmp(pstate.msg_type, "PCTH") == 0) { 
-                        MINTH = extract_integer(pstate.msg_payload);
+                        control_data.MINTH = extract_integer(pstate.msg_payload);
                         i = next_value(pstate.msg_payload, i);
-                        MAXTH = extract_integer(pstate.msg_payload + i); 
+                        control_data.MAXTH = extract_integer(pstate.msg_payload + i); 
                         //send_uart("OK");                           
                     }
                     else {
@@ -147,7 +142,7 @@ int main(void) {
         }
         
         // State machine handling
-        switch(state) {
+        switch(control_data.state) {
             case WaitForStart:
                 PWMstop();  // Stop motors when waiting for start
                 
@@ -158,23 +153,23 @@ int main(void) {
                 break;
             
             case Moving:
-                if (distance < MINTH) {
-                    surge = 0;
-                    yaw_rate = 100;
+                if (distance < control_data.MINTH) {
+                    control_data.surge = 0;
+                    control_data.yaw_rate = 100;
                 } 
-                else if (distance > MAXTH) {
-                    surge = 100;
-                    yaw_rate = 0;
+                else if (distance > control_data.MAXTH) {
+                    control_data.surge = 100;
+                    control_data.yaw_rate = 0;
                 } 
                 else {
                     // Set proportional control parameters
                     const int s = 2, y = 500;
-                    surge = distance * s; 
-                    yaw_rate = y / distance;
+                    control_data.surge = distance * s; 
+                    control_data.yaw_rate = y / distance;
                 }
                 
                 // Lights control
-                if (surge > 50) {
+                if (control_data.surge > 50) {
                     LATAbits.LATA7 = 1;  // Beam lights on
                     LATFbits.LATF0 = 0;  // Brakes off
                     LATGbits.LATG1 = 0;  // Low intensity lights off
@@ -185,7 +180,7 @@ int main(void) {
                     LATGbits.LATG1 = 1;  // Low intensity lights on
                 }
                 
-                if (yaw_rate > 15) {
+                if (control_data.yaw_rate > 15) {
                     LATBbits.LATB8 = 0;  // Left indicator off
                 } 
                 else {
@@ -194,7 +189,7 @@ int main(void) {
                 }
                 
                 // Set PWM duty cycle based on surge and yaw rate
-                PWMstart(surge, yaw_rate);
+                PWMstart(&control_data);
                 break;
         }
         

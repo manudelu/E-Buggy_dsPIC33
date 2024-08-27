@@ -33,6 +33,20 @@
 #define DISTANCE (1)
 #define BATTERY (0)
 
+// State Machine States
+typedef enum {
+    WaitForStart,
+    Moving
+} State;
+
+typedef struct {
+    int MINTH;
+    int MAXTH;
+    int yaw_rate;
+    int surge;
+    State state;
+} ControlData;
+
 // CircularBuffer structure
 typedef struct {
     char buffer[BUFFER_SIZE];
@@ -59,12 +73,6 @@ typedef struct {
     void* params;
 } heartbeat;
 
-// State Machine States
-typedef enum {
-    WaitForStart,
-    Moving
-} State;
-
 extern volatile State state;
 extern volatile int yaw_rate;
 
@@ -82,7 +90,7 @@ float getMeasurements(int flag);
 // PWM related functions
 void PWMsetup(int PWM_freq);
 void PWMstop();
-void PWMstart(int surge, int yaw_rate);
+void PWMstart(ControlData* ctrl_data);
 
 // UART related functions
 void UARTsetup();
