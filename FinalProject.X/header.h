@@ -73,9 +73,6 @@ typedef struct {
     void* params;
 } heartbeat;
 
-extern volatile State state;
-extern volatile int yaw_rate;
-
 // LED related functions
 void LigthsSetup();
 
