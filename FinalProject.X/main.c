@@ -26,6 +26,7 @@ void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
     
     // Toggle the state based on RE8 button
     if(PORTEbits.RE8 == 1){
+        // If the current state is WaitForStart, set it to Moving; otherwise, set it back to WaitForStart
         control_data.state = (control_data.state == WaitForStart) ? Moving : WaitForStart;
     }
 }
