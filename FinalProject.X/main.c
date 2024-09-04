@@ -15,7 +15,8 @@ volatile CircularBuffer cb;
 
 // Interrupt Service Routine for INT1 
 void __attribute__((__interrupt__,__auto_psv__)) _INT1Interrupt(){  
-    IFS1bits.INT1IF = 0;            
+    IFS1bits.INT1IF = 0;      
+    IEC1bits.INT1IE = 0; 
     tmr_setup_period(TIMER2, 10);   
 }
 
@@ -29,6 +30,8 @@ void __attribute__((__interrupt__,__auto_psv__)) _T2Interrupt(){
         // If the current state is WaitForStart, set it to Moving; otherwise, set it back to WaitForStart
         control_data.state = (control_data.state == WaitForStart) ? Moving : WaitForStart;
     }
+    
+    IEC1bits.INT1IE = 1; 
 }
 
 // Interrupt handler for the char recevied on UART2
